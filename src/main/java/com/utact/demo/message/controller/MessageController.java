@@ -1,17 +1,19 @@
 package com.utact.demo.message.controller;
 
+import com.utact.demo.message.dto.MessageDTO;
 import com.utact.demo.message.entity.Message;
 import com.utact.demo.message.service.MessageService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/messages")
-@CrossOrigin(origins = "${https://utact.vercel.app/}")
+@CrossOrigin(origins = "http://localhost:3000")
 public class MessageController {
     private final MessageService messageService;
 
@@ -20,24 +22,50 @@ public class MessageController {
     }
 
     @GetMapping
-    public List<Message> getAllMessages() {
-        return messageService.getMessages();
+    public List<MessageDTO> getAllMessages() {
+        return messageService.getMessages().stream()
+                .map(message -> new MessageDTO(
+                        message.getId(),
+                        message.getContent(),
+                        message.getSender(),
+                        message.getRating(),
+                        message.getSendTime()
+                ))
+                .collect(Collectors.toList());
     }
 
     @PostMapping
-    public ResponseEntity<Message> addMessage(@RequestBody Message message) {
-        if (message.getContent() == null || message.getContent().trim().isEmpty()) {
+    public ResponseEntity<MessageDTO> addMessage(@RequestBody MessageDTO request) {
+        if (request.content() == null || request.content().trim().isEmpty()) {
             return ResponseEntity.badRequest().body(null);
         }
-        if (message.getSender() == null || message.getSender().trim().isEmpty()) {
-            message.setSender("익명의 방문자");
+
+        String sender = request.sender();
+        if (sender == null || sender.trim().isEmpty()) {
+            sender = "익명의 방문자";
         }
-        if (message.getRating() == null) {
-            message.setRating(5);
+
+        Integer rating = request.rating();
+        if (rating == null) {
+            rating = 5;
         }
-        message.setTimestamp(LocalDateTime.now());
+
+        Message message = new Message();
+        message.setContent(request.content());
+        message.setSender(sender);
+        message.setRating(rating);
+        message.setSendTime(OffsetDateTime.now());
+
         Message savedMessage = messageService.save(message);
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(savedMessage);
+        MessageDTO savedMessageDto = new MessageDTO(
+                savedMessage.getId(),
+                savedMessage.getContent(),
+                savedMessage.getSender(),
+                savedMessage.getRating(),
+                savedMessage.getSendTime()
+        );
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(savedMessageDto);
     }
 }
